@@ -1,4 +1,4 @@
-run-name: Provision Azure Container Registry
+run-name: Publishing Solution Artifacts
 
 on: [push]
 
@@ -13,9 +13,6 @@ jobs:
     runs-on: [self-hosted, dotnet]
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: ${{ matrix.dotnet-version }}
       - name: Install dependencies
         run: dotnet restore ShoppingApp.sln
       - name: Build_Solution
@@ -40,7 +37,7 @@ jobs:
     runs-on: [self-hosted, azure-cli]
     env:
       resourceGroupName: 'rg-shopping-app-main'
-      location: 'eastus'
+      location: 'francecentral'
     outputs:
       acrName: ${{ steps.step1.outputs.acrName }}
       acrResourceGroupName: ${{ env.resourceGroupName }}
@@ -76,3 +73,52 @@ jobs:
           env | sort
           echo "acrName=$ACR_NAME" >> $GITHUB_OUTPUT
           echo "acrUrl=$ACR_URL" >> $GITHUB_OUTPUT
+  
+##################### Publishing Solution Artifacts Stage #####################
+  Publishing_Solution_Artifacts:
+    runs-on: [self-hosted, azure-cli]
+    needs: Provision_Azure_Container_Registry
+    outputs:
+      semVer: ${{ steps.step1.outputs.semVer }}
+    env:
+      acrUrl: ${{ needs.Provision_Azure_Container_Registry.outputs.acrUrl }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v3
+        with:
+          name: 'infrastructure'
+          path: ${{ github.workspace }}/infrastructure
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v3.0.3
+        with:
+          versionSpec: '6.x'
+          includePrerelease: true
+      - name: Determine Version
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v3.0.3
+        with:
+          useConfigFile: true
+          configFilePath: ${{ github.workspace }}/GitVersion.yml
+      - name: Log in with Azure
+        uses: azure/login@v1
+        with: 
+          creds: '${{ secrets.AZURE_CREDENTIALS }}'
+      - name: 'Build and push images to Azure Container Registry'
+        id: step1
+        env:
+          acrUrl: ${{ needs.Provision_Azure_Container_Registry.outputs.acrUrl }}
+          semVer: ${{ steps.gitversion.outputs.semVer }} 
+        run: |
+          az acr login --name ${{ env.acrUrl }}
+          docker build -t "${{ env.acrUrl }}/shoppingapp/silohost:${{ env.semVer }}" \
+          -f ${{ github.workspace }}/src/ShoppingApp.SiloHost/Dockerfile . \
+          --build-arg assemblyInformationalVersion=${{ steps.gitversion.outputs.informationalVersion }}
+          docker push "${{ env.acrUrl }}/shoppingapp/silohost:${{ env.semVer }}"
+          docker build -t "${{ env.acrUrl }}/shoppingapp/webui:${{ env.semVer }}" \
+          -f ${{ github.workspace }}/src/ShoppingApp.WebUI/Dockerfile . \
+          --build-arg assemblyInformationalVersion=${{ steps.gitversion.outputs.informationalVersion }}
+          docker push "${{ env.acrUrl }}/shoppingapp/webui:${{ env.semVer }}"
+          echo "Setting semVer for output"
+          echo "semVer=${{ env.semVer }}" >> $GITHUB_OUTPUT

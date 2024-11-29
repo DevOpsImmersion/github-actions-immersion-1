@@ -26,6 +26,12 @@ COPY ./az_cli_install.sh .
 RUN chmod +x az_cli_install.sh
 RUN ./az_cli_install.sh
 ENV AZURE_CLI=True
+# Fetch the latest Bicep CLI binary
+RUN curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+# Mark it as executable
+RUN chmod +x ./bicep
+# Add bicep to your PATH (requires admin)
+RUN mv ./bicep /usr/local/bin/bicep
 
 # Install the .NET SDK 9.0
 RUN apt-get install wget
