@@ -1,4 +1,4 @@
-run-name: Run Integration Tests
+run-name: Packing Infrastructure Artifacts
 
 on: [push]
 jobs:
@@ -18,3 +18,8 @@ jobs:
         with:
           name: Integration Tests Results
           path: IntegrationTestsResults
+      # Packing Infrastructure Artifacts
+      - uses: actions/upload-artifact@v3
+        with:
+          name: infrastructure
+          path: ${{ github.workspace }}/**/deploy/azure-container-apps
