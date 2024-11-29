@@ -126,4 +126,4 @@ Make a new JSON object with values from the previous object:
     "tenantId": "Replace with tenant value"
 }
 ```
-Add the JSON [as a GitHub secret](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure) with replaced values, required name: **AZURE_CREDENTIALS**.
+Add the JSON [as a GitHub repository secret](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure) with replaced values, required name: **AZURE_CREDENTIALS**.

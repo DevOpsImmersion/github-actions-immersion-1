@@ -1,11 +1,21 @@
-run-name: Packing Infrastructure Artifacts
+run-name: Provision Azure Container Registry
 
 on: [push]
+
+env:
+  # Staging 'sa1, sa2 sa3, ...'
+  # s - staging a - advanced => sa
+  nameSuffix: 'sa1'
+  appNamePrefix: 'shoppingapp1'
+
 jobs:
   Build_Solution:
     runs-on: [self-hosted, dotnet]
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ matrix.dotnet-version }}
       - name: Install dependencies
         run: dotnet restore ShoppingApp.sln
       - name: Build_Solution
@@ -18,8 +28,51 @@ jobs:
         with:
           name: Integration Tests Results
           path: IntegrationTestsResults
-      # Packing Infrastructure Artifacts
+      # Packing Infrastructure Artifacts Stage
       - uses: actions/upload-artifact@v3
         with:
           name: infrastructure
           path: ${{ github.workspace }}/**/deploy/azure-container-apps
+
+##################### Provision Azure Container Registry Stage #####################
+  Provision_Azure_Container_Registry:
+    needs: Build_Solution
+    runs-on: [self-hosted, azure-cli]
+    env:
+      resourceGroupName: 'rg-shopping-app-main'
+      location: 'eastus'
+    outputs:
+      acrName: ${{ steps.step1.outputs.acrName }}
+      acrResourceGroupName: ${{ env.resourceGroupName }}
+      acrUrl: ${{ steps.step1.outputs.acrUrl }}
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: 'infrastructure'
+          path: ${{ github.workspace }}/infrastructure
+      - name: Log infrastructure download
+        run: ls -R
+      - name: Log in with Azure
+        uses: azure/login@v1
+        with: 
+          creds: '${{ secrets.AZURE_CREDENTIALS }}'
+      - id: step1
+        name: Create Azure Container Registry
+        run: |
+          az --version
+          az group create --name $resourceGroupName --location $location
+          ACR_CREDENTIALS=$(az deployment group create --resource-group $resourceGroupName \
+            --template-file ${{ github.workspace }}/infrastructure/deploy/azure-container-apps/azure-container-registry.bicep \
+            --parameters appNamePrefix=$appNamePrefix --query properties.outputs)
+          # Retrieve the output values from the deployment
+          ACR_NAME=$(jq --raw-output '.acrName.value' <<< $ACR_CREDENTIALS)
+          ACR_URL=$(jq --raw-output '.acrUrl.value' <<< $ACR_CREDENTIALS)
+          if [[ -z $ACR_URL ]]; then
+            echo "Error: ACR_URL is empty"
+            exit 1
+          fi
+          echo "Setting ACR_CREDENTIALS for output"
+          echo "ACR credentials is: $ACR_NAME $ACR_URL"
+          env | sort
+          echo "acrName=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "acrUrl=$ACR_URL" >> $GITHUB_OUTPUT
