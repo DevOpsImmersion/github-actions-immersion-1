@@ -1,24 +1,20 @@
-run-name: Analyze ReSharper CLI Results
+run-name: Run Integration Tests
 
 on: [push]
 jobs:
   Build_Solution:
-    runs-on: [self-hosted, dotnet, resharper-cli]
-    env:
-      buildConfiguration: Release
+    runs-on: [self-hosted, dotnet]
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
         run: dotnet restore ShoppingApp.sln
-      - name: Install ReSharper CLI
-        run: dotnet tool update -g JetBrains.ReSharper.GlobalTools
-      - name: 'Inspect Code with ReSharper CLI'
-        run: |
-          export PATH=$PATH:/resharpercli
-          jb inspectcode ShoppingApp.sln -f="Html;Xml" --profile="ShoppingApp.sln.DotSettings" \
-            -o="inspect-code-output" --properties:Configuration=$buildConfiguration
-      - name: 'Analyze ReSharper CLI Results'
-        shell: pwsh
-        run: ./AnalyzeReSharperCLIResults.ps1
       - name: Build_Solution
         run: dotnet build ShoppingApp.sln --configuration Release --no-restore
+      - name: Run Integration Tests
+        run: > 
+          dotnet test test/ShoppingApp.Tests --no-restore --verbosity normal --logger trx 
+          --results-directory "IntegrationTestsResults"
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Integration Tests Results
+          path: IntegrationTestsResults
