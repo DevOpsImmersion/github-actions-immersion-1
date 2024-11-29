@@ -1,11 +1,8 @@
-run-name: Publishing Solution Artifacts
+run-name: Provision Infrastructure
 
 on: [push]
 
 env:
-  # Staging 'sa1, sa2 sa3, ...'
-  # s - staging a - advanced => sa
-  nameSuffix: 'sa1'
   appNamePrefix: 'shoppingapp1'
 
 jobs:
@@ -122,3 +119,38 @@ jobs:
           docker push "${{ env.acrUrl }}/shoppingapp/webui:${{ env.semVer }}"
           echo "Setting semVer for output"
           echo "semVer=${{ env.semVer }}" >> $GITHUB_OUTPUT
+
+##################### Provision Infrastructure Stages #####################
+  Provision_Infrastructure:
+    runs-on: [self-hosted, azure-cli]
+    needs: [ Provision_Azure_Container_Registry, Publishing_Solution_Artifacts ]
+    env:
+      nameSuffix: 'sa1'
+      location: 'francecentral'
+      acrName: ${{ needs.Provision_Azure_Container_Registry.outputs.acrName }}
+      acrResourceGroupName: ${{ needs.Provision_Azure_Container_Registry.outputs.acrResourceGroupName }}
+      acrUrl: ${{ needs.Provision_Azure_Container_Registry.outputs.acrUrl }}
+      semVer: ${{ needs.Publishing_Solution_Artifacts.outputs.semVer }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: 'infrastructure'
+          path: ${{ github.workspace }}/infrastructure
+      - name: Log in with Azure
+        uses: azure/login@v1
+        with: 
+          creds: '${{ secrets.AZURE_CREDENTIALS }}'
+      - name: Provision Infrastructure
+        run: |
+          az --version
+          AZ_ACCOUNT=$(az account show)
+          servicePrincipalId=$(jq --raw-output '.id' <<< $AZ_ACCOUNT)
+          resourceGroupName='rg-${{ env.appNamePrefix }}-${{ env.nameSuffix }}'
+          az group create --name $resourceGroupName --location ${{ env.location }}
+          DEPLOYMENT_OUTPUT=$(az deployment group create --resource-group $resourceGroupName \
+            --template-file ${{ github.workspace }}/infrastructure/deploy/azure-container-apps/solution-infrastructure.bicep \
+            --parameters appNamePrefix='${{ env.appNamePrefix }}' nameSuffix='${{ env.nameSuffix }}' semVer='${{ env.semVer }}' \
+            sqlAdministratorPassword='Passw@rd1+' acrName=${{ env.acrName }} acrUrl=${{ env.acrUrl }} \
+            acrResourceGroupName=${{ env.acrResourceGroupName }} executorSecurityPrincipal=$servicePrincipalId \
+            --query properties.outputs)
