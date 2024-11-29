@@ -1,4 +1,4 @@
-run-name: Provision Infrastructure
+run-name: Environments
 
 on: [push]
 
@@ -121,10 +121,16 @@ jobs:
           echo "semVer=${{ env.semVer }}" >> $GITHUB_OUTPUT
 
 ##################### Provision Infrastructure Stages #####################
-  Provision_Infrastructure:
+  Provision_Staging_Infrastructure:
+    environment:
+      name: 'Staging'
     runs-on: [self-hosted, azure-cli]
     needs: [ Provision_Azure_Container_Registry, Publishing_Solution_Artifacts ]
+    outputs:
+      webUiCaUrl: ${{ steps.step1.outputs.webUiCaUrl }}
     env:
+      # Staging 'sa1, sa2 sa3, ...'
+      # s - staging a - advanced => sa
       nameSuffix: 'sa1'
       location: 'francecentral'
       acrName: ${{ needs.Provision_Azure_Container_Registry.outputs.acrName }}
@@ -142,6 +148,7 @@ jobs:
         with: 
           creds: '${{ secrets.AZURE_CREDENTIALS }}'
       - name: Provision Infrastructure
+        id: step1
         run: |
           az --version
           AZ_ACCOUNT=$(az account show)
@@ -154,3 +161,5 @@ jobs:
             sqlAdministratorPassword='Passw@rd1+' acrName=${{ env.acrName }} acrUrl=${{ env.acrUrl }} \
             acrResourceGroupName=${{ env.acrResourceGroupName }} executorSecurityPrincipal=$servicePrincipalId \
             --query properties.outputs)
+          WEBUI_CA_URL=$(jq --raw-output '.webUiCaUrl.value' <<< $DEPLOYMENT_OUTPUT)
+          echo "webUiCaUrl=$WEBUI_CA_URL" >> $GITHUB_OUTPUT
