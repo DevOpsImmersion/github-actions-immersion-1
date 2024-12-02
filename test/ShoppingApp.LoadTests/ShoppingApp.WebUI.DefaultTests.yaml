@@ -1,8 +1,9 @@
 version: v0.1
 testId: shoppingapp-webui-default-tests
 displayName: ShoppingApp.WebUI.DefaultTests
-testPlan: ShoppingApp.WebUI.DefaultTests.jmx
 description: 'Default load tests for ShoppingApp.WebUI'
+testPlan: ShoppingApp.WebUI.DefaultTests.jmx
+testType: JMX
 engineInstances: 1
 failureCriteria:
   - avg(response_time_ms) > 500
