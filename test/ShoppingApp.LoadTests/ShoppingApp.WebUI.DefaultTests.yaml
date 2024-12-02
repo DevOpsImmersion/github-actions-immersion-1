@@ -1,5 +1,5 @@
 version: v0.1
-testId: ShoppingApp-WebUI-DefaultTests
+testId: shoppingapp-webui-default-tests
 displayName: ShoppingApp.WebUI.DefaultTests
 testPlan: ShoppingApp.WebUI.DefaultTests.jmx
 description: 'Default load tests for ShoppingApp.WebUI'
