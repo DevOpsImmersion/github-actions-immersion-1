@@ -1,22 +1,16 @@
-run-name: Analyze ReSharper CLI Results
+run-name: Run Integration Tests
 
 on: [push]
 jobs:
   Build_Solution:
-    runs-on: [self-hosted, dotnet, resharper-cli]
-    env:
-      buildConfiguration: Release
+    runs-on: [self-hosted, dotnet]
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
         run: dotnet restore ShoppingApp.slnx
       - name: Build_Solution
         run: dotnet build ShoppingApp.slnx --configuration Release --no-restore
-      - name: 'Inspect Code with ReSharper CLI'
-        run: |
-          export PATH=$PATH:/resharpercli
-          jb inspectcode ShoppingApp.slnx --no-build -f="Html;Xml" --profile="ShoppingApp.sln.DotSettings" \
-            -o="inspect-code-output" --properties:Configuration=$buildConfiguration
-      - name: 'Analyze ReSharper CLI Results'
-        shell: pwsh
-        run: ./AnalyzeReSharperCLIResults.ps1
+      - name: Run Integration Tests
+        run: dotnet run --project test/ShoppingApp.Tests
+      - name: Run FSharp Integration Tests
+        run: dotnet run --project test/ShoppingApp.Tests.FSharp
