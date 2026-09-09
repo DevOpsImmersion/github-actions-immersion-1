@@ -194,6 +194,10 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       - name: Run Load Testing
         uses: azure/load-testing@v1
+        env:
+          # Temporary: v1 uses util.isNullOrUndefined, which is unavailable in Node 24.
+          # Remove after upgrading to a compatible action; Node 20 removal: 2026-09-23.
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
         with:
           loadTestConfigFile: ${{ env.loadTestConfigFile }}
           loadTestResource: 'lt-${{ env.appNamePrefix }}-${{ env.nameSuffix }}'
